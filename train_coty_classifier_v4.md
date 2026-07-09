@@ -2,7 +2,7 @@
 
 ## Overview
 
-Training script (v4) for the binary **Canola Cotyledon (cn_coty) vs Non-Coty** classifier. The predecessor to v5, this version introduced AdamW, label smoothing, LR warmup + cosine annealing, mixed precision, strong augmentation, MixUp, and EMA.
+Training script (v4) for the binary **Canola Cotyledon (cn_coty) vs Non-Coty** classifier. Introduces AdamW, label smoothing, LR warmup + cosine annealing, mixed precision, strong augmentation, MixUp, and EMA.
 
 ## Improvements Over v3
 
@@ -112,19 +112,6 @@ python3 train_coty_classifier_v4.py \
     --label_smoothing 0.05 --mixup_alpha 0 --weight_decay 2e-4 \
     --name coty_effnetb2_v12 --device 0
 ```
-
-## Difference from v5
-
-| Feature | v4 | v5 |
-|---|---|---|
-| Staged backbone unfreezing | No | Yes |
-| CutMix | No | Yes |
-| Focal loss | No | Yes |
-| Gradient accumulation | No | Yes |
-| TTA evaluation | No | Yes |
-| Per-class epoch metrics | No | Yes |
-| Threshold optimization | No | Yes |
-| Augmentation strength control | Fixed | `light`/`medium`/`strong` |
 
 ## Dependencies
 

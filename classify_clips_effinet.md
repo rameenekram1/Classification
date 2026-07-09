@@ -82,16 +82,6 @@ Matches the production inference transform used during training:
 Resize((224, 224)) → ToTensor() → Normalize(ImageNet mean/std)
 ```
 
-## Difference from `inference_fenet.py`
-
-| Feature | `classify_clips_effinet.py` | `inference_fenet.py` |
-|---|---|---|
-| Copies companion JSON | Yes | No |
-| Low-confidence folder | Yes | No |
-| Pipeline (multi-field) | No | Yes |
-| Summary report `.txt` | Yes | No |
-| Architecture support | Broader | Narrower |
-
 ## Dependencies
 
 `torch`, `torchvision`, `PIL`, `cv2`, `numpy`, `csv`, `shutil`, `logging`, `pathlib`, `traceback`
