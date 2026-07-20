@@ -13,12 +13,17 @@ DJI drone images + LabelMe/AnyLabeling JSONs
  clipping-bboxes.py          ← Extract 224×224 crops from bbox detections
          │
          ▼
+ data_engineering.py         ← Percentile-based plant-coverage cleaning (drop/zoom/keep)
+         │
+         ▼
  split_dataset_v2.py         ← Group-aware train/val split (no leakage)
          │
          ▼
  train_coty_classifier_v4.py ← Train with EMA + augmentation
+ train_coty_classifier_v5.py ← Successor: staged unfreezing, CutMix, focal loss, TTA
          │
          ├──► classify_clips_effinet.py    ← Inference on flat folder
+         ├──► inference_fenet.py           ← Production inference across pipeline field dirs
          └──► qc_classification_effinet.py ← Evaluation against labeled ground truth
 ```
 
@@ -40,6 +45,32 @@ Extracts fixed 224×224 crops centered on bounding box detections from LabelMe/A
 | `OUT_DIR` | Destination for cropped clips |
 | `MAX_CLIPS` | Stop early after N clips (`None` = all) |
 | `MIN_CONF` | Only clip shapes with confidence ≥ this value |
+
+---
+
+#### `data_engineering.py`
+Diagnoses and cleans the coty classifier dataset by scoring each image for plant coverage (HSV-based heuristic). Images are categorized as **BAD** (drop), **SMALL** (center-crop zoom), or **GOOD** (keep as-is). Thresholds are derived from this dataset's own `plant_score` percentile distribution rather than fixed absolute fractions, so the split adapts to shifts in camera/altitude/lighting.
+
+```bash
+python data_engineering.py \
+    --src /path/to/dataset \
+    --dst /path/to/dataset_cleaned \
+    --cn_coty_bad_pct 5 --cn_coty_small_pct 25 \
+    --non_coty_bad_pct 5 --non_coty_small_pct 25 \
+    --zoom_crop 0.65
+```
+
+| Argument | Default | Description |
+|--------|---------|-------------|
+| `--src` | required | Source dataset root (flat or train/val split) |
+| `--dst` | `None` | Output root (required unless `--analyze_only`) |
+| `--zoom_crop` | `0.65` | Center-crop fraction for SMALL images |
+| `--analyze_only` | `False` | Print stats only, write nothing |
+| `--cn_coty_bad_pct` | `5` | cn_coty: percentile rank used as the drop cutoff |
+| `--cn_coty_small_pct` | `25` | cn_coty: percentile rank used as the zoom cutoff |
+| `--non_coty_bad_pct` | `5` | non_coty: percentile rank used as the drop cutoff |
+| `--non_coty_small_pct` | `25` | non_coty: percentile rank used as the zoom cutoff |
+| `--visualize` | `False` | Save BAD/SMALL/GOOD grid images per class |
 
 ---
 
@@ -115,6 +146,35 @@ All use ImageNet pretrained weights; the classification head is replaced for bin
 
 ---
 
+#### `train_coty_classifier_v5.py`
+Successor to v4, tuned for drone-captured field imagery. Toned-down spatial/color augmentation (preserves small cotyledons and green-hue signal), CutMix instead of MixUp, staged backbone unfreezing, higher head dropout, gradient accumulation, TTA (hflip + vflip) at evaluation, and optional focal loss.
+
+```bash
+python train_coty_classifier_v5.py \
+    --model efficientnet_b2 \
+    --data  /path/to/dataset_split \
+    --name  coty_effnetb2_v5 \
+    --epochs 80 --batch 32 --patience 25
+```
+
+| Argument | Default | Description |
+|--------|---------|-------------|
+| `--model` | `efficientnet_b2` | Architecture (same supported list as v4) |
+| `--data` | required | Dataset root with `train/<class>/` and `val/<class>/` |
+| `--epochs` | `80` | Maximum training epochs |
+| `--batch` | `32` | Batch size per GPU |
+| `--aug_strength` | `medium` | `light` / `medium` / `strong` |
+| `--freeze_epochs` | `5` | Epochs to freeze backbone (0 = train from scratch) |
+| `--backbone_lr_mult` | `0.1` | Backbone LR = `lr0 × this` after unfreezing |
+| `--cutmix_alpha` | `0.0` | CutMix beta param (0 = disabled; try 1.0) |
+| `--focal_gamma` | `0.0` | Focal loss gamma (0 = standard CE; try 1.5–2.0) |
+| `--grad_accum` | `1` | Gradient accumulation steps |
+| `--tta` | `True` | TTA evaluation (hflip + vflip) at end |
+
+**Outputs** (saved to `runs/classify/<name>/`): `weights/best.pt`, `weights/last.pt`, `train_log.csv`, `optimal_threshold.txt`.
+
+---
+
 ### Inference
 
 #### `classify_clips_effinet.py`
@@ -142,6 +202,27 @@ OUTPUT_FOLDER/
 ├── classification_results.csv
 └── summary_report.txt
 ```
+
+---
+
+#### `inference_fenet.py`
+Production inference across an entire pipeline output tree — iterates every field directory, classifying each field's `Tile_images/` folder in place. Model is loaded once and reused across all fields.
+
+```bash
+python inference_fenet.py
+```
+
+Edit `MODEL_PATH`, `MODEL_NAME`, `PIPELINE_OUTPUT`, and `OUTPUT_FOLDER` at the top before running.
+
+**Output structure (per field):**
+```
+PIPELINE_OUTPUT/<field_dir>/object_detection/Tile_images/output_v12/
+├── cn_coty/
+├── non_coty/
+└── classification_results.csv
+```
+
+**Skip logic:** skips fields with no `Tile_images/`, and skips fields that already have a `classification_results.csv` (resume-safe).
 
 ---
 
