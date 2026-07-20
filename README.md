@@ -20,10 +20,8 @@ DJI drone images + LabelMe/AnyLabeling JSONs
          │
          ▼
  train_coty_classifier_v4.py ← Train with EMA + augmentation
- train_coty_classifier_v5.py ← Successor: staged unfreezing, CutMix, focal loss, TTA
          │
          ├──► classify_clips_effinet.py    ← Inference on flat folder
-         ├──► inference_fenet.py           ← Production inference across pipeline field dirs
          └──► qc_classification_effinet.py ← Evaluation against labeled ground truth
 ```
 
@@ -146,15 +144,6 @@ All use ImageNet pretrained weights; the classification head is replaced for bin
 
 ---
 
-#### `train_coty_classifier_v5.py`
-Successor to v4, tuned for drone-captured field imagery. Toned-down spatial/color augmentation (preserves small cotyledons and green-hue signal), CutMix instead of MixUp, staged backbone unfreezing, higher head dropout, gradient accumulation, TTA (hflip + vflip) at evaluation, and optional focal loss.
-
-```bash
-python train_coty_classifier_v5.py \
-    --model efficientnet_b2 \
-    --data  /path/to/dataset_split \
-    --name  coty_effnetb2_v5 \
-    --epochs 80 --batch 32 --patience 25
 ```
 
 | Argument | Default | Description |
@@ -175,7 +164,7 @@ python train_coty_classifier_v5.py \
 
 ---
 
-### Inference
+### **Inference**
 
 #### `classify_clips_effinet.py`
 Classifies a flat folder of clipped images. Sorts outputs into per-class subfolders and copies companion JSON files. Generates a per-image CSV and summary report.
@@ -198,21 +187,11 @@ python classify_clips_effinet.py
 OUTPUT_FOLDER/
 ├── cn_coty/          ← classified images + JSONs
 ├── non_coty/
-├── low_confidence/    ← only if CONFIDENCE_THRESHOLD > 0
 ├── classification_results.csv
 └── summary_report.txt
 ```
 
 ---
-
-#### `inference_fenet.py`
-Production inference across an entire pipeline output tree — iterates every field directory, classifying each field's `Tile_images/` folder in place. Model is loaded once and reused across all fields.
-
-```bash
-python inference_fenet.py
-```
-
-Edit `MODEL_PATH`, `MODEL_NAME`, `PIPELINE_OUTPUT`, and `OUTPUT_FOLDER` at the top before running.
 
 **Output structure (per field):**
 ```
@@ -221,10 +200,6 @@ PIPELINE_OUTPUT/<field_dir>/object_detection/Tile_images/output_v12/
 ├── non_coty/
 └── classification_results.csv
 ```
-
-**Skip logic:** skips fields with no `Tile_images/`, and skips fields that already have a `classification_results.csv` (resume-safe).
-
----
 
 ### Evaluation
 
