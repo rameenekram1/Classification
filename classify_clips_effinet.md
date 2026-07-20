@@ -35,7 +35,7 @@ convnext_tiny, convnext_small
 
 Full pipeline:
 1. Loads model.
-2. Creates `output_folder/<class>/` subfolders. If `CONFIDENCE_THRESHOLD > 0`, also creates `output_folder/low_confidence/`.
+2. Creates `output_folder/<class>/` subfolders.
 3. Collects and sorts all image files from `input_folder`.
 4. Runs batched inference (PIL → tensor → softmax → top-1 class + confidence).
 5. Copies each image to its predicted class subfolder (or `low_confidence/` if below threshold).
@@ -59,9 +59,6 @@ OUTPUT_FOLDER/
 │   ├── image_bbox000.json
 │   └── ...
 ├── non_coty/
-│   └── ...
-├── low_confidence/           # only created if CONFIDENCE_THRESHOLD > 0
-│   └── ...
 ├── classification_results.csv
 ├── summary_report.txt
 └── classify_<timestamp>.log
